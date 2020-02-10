@@ -36,3 +36,31 @@ tags
 *.out
 *.app
 
+# redis
+.*.swp
+*.o
+*.log
+dump.rdb
+redis-benchmark
+redis-check-aof
+redis-check-dump
+redis-cli
+redis-sentinel
+redis-server
+doc-tools
+release
+redis-3.0-annotated/misc/*
+redis-3.0-annotated/src/release.h
+appendonly.aof
+SHORT_TERM_TODO
+release.h
+redis-3.0-annotated/src/transfer.sh
+redis-3.0-annotated/src/configs
+redis.ds
+redis-3.0-annotated/src/redis.conf
+redis-3.0-annotated/deps/lua/src/lua
+redis-3.0-annotated/deps/lua/src/luac
+redis-3.0-annotated/deps/lua/src/liblua.a
+.make-*
+.prerequisites
+*.dSYM
