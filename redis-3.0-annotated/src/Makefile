@@ -23,7 +23,8 @@ WARN=-Wall
 OPT=$(OPTIMIZATION)
 
 PREFIX?=/usr/local
-INSTALL_BIN=$(PREFIX)/bin
+# INSTALL_BIN=$(PREFIX)/bin by fjp
+INSTALL_BIN=$(PREFIX)
 INSTALL=install
 
 # Default allocator
