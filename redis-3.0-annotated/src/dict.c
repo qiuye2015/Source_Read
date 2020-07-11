@@ -195,8 +195,7 @@ static void _dictReset(dictht *ht)
  *
  * T = O(1)
  */
-dict *dictCreate(dictType *type,
-        void *privDataPtr)
+dict *dictCreate(dictType *type, void *privDataPtr)
 {
     dict *d = zmalloc(sizeof(*d));
 
