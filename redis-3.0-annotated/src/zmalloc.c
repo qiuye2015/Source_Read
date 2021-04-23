@@ -85,9 +85,9 @@ void zlibc_free(void *ptr) {
 
 #endif
 
+//if (_n 主要是考虑对齐问题，保证新增的_n 是 sizeof(long)的倍数。
 #define update_zmalloc_stat_alloc(__n) do { \
     size_t _n = (__n); \
-	//主要是考虑对齐问题，保证新增的_n 是 sizeof(long)的倍数。
     if (_n&(sizeof(long)-1)) _n += sizeof(long)-(_n&(sizeof(long)-1)); \
     if (zmalloc_thread_safe) { \
         update_zmalloc_stat_add(_n); \

@@ -4907,19 +4907,20 @@ void sentinelHandleRedisInstance(sentinelRedisInstance *ri) {
 }
 
 /* Perform scheduled operations for all the instances in the dictionary.
- * Recursively call the function against dictionaries of slaves. */
-// 对被 Sentinel 监视的所有实例（包括主服务器、从服务器和其他 Sentinel ）
-// 进行定期操作
-//
-//  sentinelHandleRedisInstance
-//              |
-//              |
-//              v
-//            master
-//             /  \
-//            /    \
-//           v      v
-//       slaves    sentinels
+ * Recursively call the function against dictionaries of slaves.
+ *对被 Sentinel 监视的所有实例（包括主服务器、从服务器和其他 Sentinel ）
+ * 进行定期操作
+ *
+ *  sentinelHandleRedisInstance
+ *              |
+ *              |
+ *              v
+ *            master
+  *            /  \
+ *            /    \
+ *           v      v
+ *       slaves    sentinels
+ */
 void sentinelHandleDictOfRedisInstances(dict *instances) {
     dictIterator *di;
     dictEntry *de;
