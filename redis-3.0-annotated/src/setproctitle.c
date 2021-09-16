@@ -78,7 +78,7 @@ static inline size_t spt_min(size_t a, size_t b) {
  */
 static int spt_clearenv(void) {
 #if __GLIBC__
-	clearenv();
+	clearenv();//清理环境变量,environ置为NULL
 
 	return 0;
 #else
@@ -100,13 +100,13 @@ static int spt_copyenv(char *oldenv[]) {
 	extern char **environ;
 	char *eq;
 	int i, error;
-
+	//如果environ != oldenv则说明environ已经被设置过了,直接返回成功
 	if (environ != oldenv)
 		return 0;
-
+	//让老的environ失效,但是不释放那片内存
 	if ((error = spt_clearenv()))
 		goto error;
-
+	//setenv会生成新的environ, 不必手动设置新environ的内
 	for (i = 0; oldenv[i]; i++) {
 		if (!(eq = strchr(oldenv[i], '=')))
 			continue;
@@ -144,9 +144,14 @@ static int spt_copyargs(int argc, char *argv[]) {
 	return 0;
 } /* spt_copyargs() */
 
-
+/*命令行参数argv和环境变量信息environ是在一块连续的内存中表示的，并且environ紧跟在argv后面
+1. 重新修改全局environ指针指向
+2. 重新修改除argv[0]以外的argv指针指向
+3. 扩容argv[0]
+4. 通过修改argv[0]的内容设置进程名
+*/
 void spt_init(int argc, char *argv[]) {
-        char **envp = environ;
+	char **envp = environ;//全局的外部变量,存储着系统的环境变量
 	char *base, *end, *nul, *tmp;
 	int i, error;
 
@@ -154,7 +159,7 @@ void spt_init(int argc, char *argv[]) {
 		return;
 
 	nul = &base[strlen(base)];
-	end = nul + 1;
+	end = nul + 1;//end 表示argv[1]
 
 	for (i = 0; i < argc || (i >= argc && argv[i]); i++) {
 		if (!argv[i] || argv[i] < end)
@@ -169,12 +174,12 @@ void spt_init(int argc, char *argv[]) {
 
 		end = envp[i] + strlen(envp[i]) + 1;
 	}
-
+	//将原进程名备份
 	if (!(SPT.arg0 = strdup(argv[0])))
 		goto syerr;
 
 #if __GLIBC__
-	if (!(tmp = strdup(program_invocation_name)))
+	if (!(tmp = strdup(program_invocation_name)))//argv[0]==program_invocation_name
 		goto syerr;
 
 	program_invocation_name = tmp;
@@ -190,13 +195,17 @@ void spt_init(int argc, char *argv[]) {
 	setprogname(tmp);
 #endif
 
-
+	//在新的内存区域,产生新的environ, 原来的environ内存区域将归base所有
 	if ((error = spt_copyenv(envp)))
 		goto error;
-
+	//在新的内存区域产生新的除argv[0]以外的argv, 原来的argv[1-n]内存区域将归base所有
 	if ((error = spt_copyargs(argc, argv)))
 		goto error;
-
+    /**
+        至此, 原来argv environ共有的那片连续内存全部被转换成base, 即char*, 也是argv[0], 也就是进程名。
+        argv和environ将不再连续, 新的内容全部由strdup生成
+        我们修改进程名, 只需要改SPT->base就可以了。
+    */
 	SPT.nul  = nul;
 	SPT.base = base;
 	SPT.end  = end;

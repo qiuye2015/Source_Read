@@ -211,8 +211,8 @@ void *bioProcessBackgroundJobs(void *arg) {
 
     /* Make the thread killable at any time, so that bioKillThreads()
      * can work reliably. */
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);//设置线程的取消状态
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);//设置线程相应取消命令方式
 
     pthread_mutex_lock(&bio_mutex[type]);
     /* Block SIGALRM so we are sure that only the main thread will

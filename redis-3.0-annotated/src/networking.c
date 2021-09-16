@@ -88,7 +88,7 @@ redisClient *createClient(int fd) {
     if (fd != -1) {
         // 非阻塞
         anetNonBlock(NULL,fd);
-        // 禁用 Nagle 算法
+        // 禁用 Nagle 算法,允许小包的发送
         anetEnableTcpNoDelay(NULL,fd);
         // 设置 keep alive
         if (server.tcpkeepalive)
@@ -1555,7 +1555,7 @@ void readQueryFromClient(aeEventLoop *el, int fd, void *privdata, int mask) {
     // 设置服务器的当前客户端
     server.current_client = c;
     
-    // 读入长度（默认为 16 MB）
+    // 读入长度（默认为 16 KB）
     readlen = REDIS_IOBUF_LEN;
 
     /* If this is a multi bulk request, and we are processing a bulk reply

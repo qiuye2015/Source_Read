@@ -36,3 +36,5 @@ tags
 *.out
 *.app
 
+cscope.files
+redis-3.0-annotated/bin/
