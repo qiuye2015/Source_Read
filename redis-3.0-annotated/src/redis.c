@@ -3462,7 +3462,18 @@ void monitorCommand(redisClient *c) {
  * When we try to evict a key, and all the entries in the pool don't exist
  * we populate it again. This time we'll be sure that the pool has at least
  * one key that can be evicted, if there is at least one key that can be
- * evicted in the whole database. */
+ * evicted in the whole database. 
+
+ * LRU近似算法
+ * Redis使用一个在恒定内存中运行的LRU近似算法。
+ * 每当有一个键要过期时，我们会采样N个键（通常是大约5个）来填充一个最佳键池，大小为M个键（
+ * 池大小由REDIS_EVICTION_POOL_SIZE=16定义）
+ * 采样的N个键会根据其访问时间是否比池中当前的键更老，被添加到键过期池中
+ * 填充完池后，池中最老的键会被过期
+ * 然而，需要注意的是，当键被删除时，我们并不会从池中移除这些键，因为池中可能包含一些已经不存在的键
+ * 当我们尝试淘汰一个键，而池中的所有条目都不存在时，我们会再次填充池。
+ * 这次，我们可以确保池中至少有一个可以被淘汰的键，如果整个数据库中至少有一个可以被淘汰的键的话。
+ */
 
 /* Create a new eviction pool. */
 struct evictionPoolEntry *evictionPoolAlloc(void) {
@@ -3484,7 +3495,11 @@ struct evictionPoolEntry *evictionPoolAlloc(void) {
  *
  * We insert keys on place in ascending order, so keys with the smaller
  * idle time are on the left, and keys with the higher idle time on the
- * right. */
+ * right. 
+ * 这是 freeMemoryIfNeeded() 的辅助函数，它用于在每次我们想要使一个键过期时向驱逐池(evictionPool)中填充几个条目。
+ * 如果某个键的空闲时间小于当前某个键的空闲时间，则将其添加到驱逐池。如果有空闲条目，键总是会被添加。
+ * 我们按升序在适当的位置插入键，因此具有较小空闲时间的键位于左侧，而具有较高空闲时间的键位于右侧
+ */
 
 #define EVICTION_SAMPLES_ARRAY_SIZE 16
 void evictionPoolPopulate(dict *sampledict, dict *keydict, struct evictionPoolEntry *pool) {
@@ -3493,7 +3508,10 @@ void evictionPoolPopulate(dict *sampledict, dict *keydict, struct evictionPoolEn
     dictEntry **samples;
 
     /* Try to use a static buffer: this function is a big hit...
-     * Note: it was actually measured that this helps. */
+     * Note: it was actually measured that this helps. 
+     * 尝试使用静态缓冲区：这个函数是一个重要的改进... 
+     * 注意：实际上已经测量过，这是有帮助的
+     */
     if (server.maxmemory_samples <= EVICTION_SAMPLES_ARRAY_SIZE) {
         samples = _samples;
     } else {
@@ -3517,33 +3535,47 @@ void evictionPoolPopulate(dict *sampledict, dict *keydict, struct evictionPoolEn
         key = dictGetKey(de);
         /* If the dictionary we are sampling from is not the main
          * dictionary (but the expires one) we need to lookup the key
-         * again in the key dictionary to obtain the value object. */
+         * again in the key dictionary to obtain the value object. 
+         * 如果我们正在采样的字典不是主字典（而是过期的那个），我们需要在键字典中再次查找键以获取值对象
+         */
         if (sampledict != keydict) de = dictFind(keydict, key);
         o = dictGetVal(de);
         idle = estimateObjectIdleTime(o);
 
         /* Insert the element inside the pool.
          * First, find the first empty bucket or the first populated
-         * bucket that has an idle time smaller than our idle time. */
+         * bucket that has an idle time smaller than our idle time. 
+         * 将元素插入到池中。 
+         * 首先，找到第一个空的桶，
+         * 或者找到第一个已填充的桶，该桶的空闲时间小于我们的空闲时间
+         */
         k = 0;
         while (k < REDIS_EVICTION_POOL_SIZE &&
                pool[k].key &&
                pool[k].idle < idle) k++;
         if (k == 0 && pool[REDIS_EVICTION_POOL_SIZE-1].key != NULL) {
             /* Can't insert if the element is < the worst element we have
-             * and there are no empty buckets. */
+             * and there are no empty buckets. 
+             * 如果待插入的元素小于我们已有的最差元素，并且没有空的桶可用，那么我们就无法插入这个元素
+             */
             continue;
         } else if (k < REDIS_EVICTION_POOL_SIZE && pool[k].key == NULL) {
-            /* Inserting into empty position. No setup needed before insert. */
+            /* Inserting into empty position. No setup needed before insert.
+             * 插入到空的位置。在插入之前不需要进行任何设置
+             */
         } else {
             /* Inserting in the middle. Now k points to the first element
-             * greater than the element to insert.  */
+             * greater than the element to insert. 
+             * 在中间插入。现在，k 指向的是第一个大于待插入元素的元素
+             * */
             if (pool[REDIS_EVICTION_POOL_SIZE-1].key == NULL) {
                 /* Free space on the right? Insert at k shifting
                  * all the elements from k to end to the right. */
                 memmove(pool+k+1,pool+k,
                     sizeof(pool[0])*(REDIS_EVICTION_POOL_SIZE-k-1));
             } else {
+                // 右边没有空闲空间？在 k-1 的位置插入。将 k（包括 k）左边的所有元素向左移动，
+                // 这样我们就丢弃了空闲时间较小的元素
                 /* No free space on right? Insert at k-1 */
                 k--;
                 /* Shift all elements on the left of k (included) to the
@@ -3665,7 +3697,10 @@ int freeMemoryIfNeeded(void) {
                         pool[REDIS_EVICTION_POOL_SIZE-1].idle = 0;
 
                         /* If the key exists, is our pick. Otherwise it is
-                         * a ghost and we need to try the next element. */
+                         * a ghost and we need to try the next element. 
+                         * 如果键存在，我们就选择它。
+                         * 否则，它是一个"幽灵"，我们需要尝试下一个元素
+                         */
                         if (de) {
                             bestkey = dictGetKey(de);
                             break;
